@@ -37,8 +37,7 @@ static void TDS_Channel_Config(void)
 
 /***
  * @brief 标准TDS曲线计算函数
- * 根据附件标准曲线: y = 66.71x² - 127.93x + 428.7x
- * 简化为: y = 66.71x² - 127.93x + 428.7
+ * 根据附件标准曲线: y = 66.71x^3 - 127.93x^2 + 428.7x
  * @param voltage: 输入电压值(V)
  * @return 返回对应的NTU值(ppm)
  */
@@ -49,8 +48,8 @@ static float TDS_Curve_Calculate(float voltage)
     float b = -127.93f;
     float c = 428.7f;
 
-    // y = ax² + bx + c
-    float tds_value = a * voltage * voltage + b * voltage + c;
+    // y = ax^3 + bx^2 + cx
+    float tds_value = a * voltage * voltage * voltage + b * voltage * voltage + c * voltage;
 
     // 限制范围在0-1400ppm
     if (tds_value < 0.0f)
@@ -157,19 +156,37 @@ float TDS_Read_Corrected(void)
     float temperature;
     float t_correction_factor;
     float tds_corrected;
+    float v_corrected;
 
-    // 读取原始TDS值
+    // 1. 读取原始数据以获取最新电压 (更新 tds_data.raw_voltage)
     TDS_Read_Raw();
 
-    // 读取DS18B20温度
+    // 2. 读取DS18B20温度
     temperature = DS18B20_Get_Temp();
     tds_data.temperature = temperature;
 
-    // 计算温度校正系数
+    // 3. 计算温度校正系数
+    // T_factor = 1 + 0.02 * (T - 25)
     t_correction_factor = TDS_Temperature_Correction_Factor(temperature);
 
-    // 应用温度校正: TDS_corrected = TDS_raw / T_correction_factor
-    tds_corrected = tds_data.raw_tds / t_correction_factor;
+    // 4. 应用温度校正到电压 (标准做法)
+    // 根据物理特性，温度升高电导率升高，电压升高。
+    // 要归一化到25℃，需除以校正系数。
+    // 例如：35℃时系数1.2，测得1.2V，归一化后为1.0V(即25℃时的等效电压)
+    if (t_correction_factor != 0.0f)
+    {
+        v_corrected = tds_data.raw_voltage / t_correction_factor;
+    }
+    else
+    {
+        v_corrected = tds_data.raw_voltage;
+    }
+
+    // 5. 使用校正后的电压重新计算TDS
+    tds_corrected = TDS_Curve_Calculate(v_corrected);
+
+    // 6. 应用K值校准
+    tds_corrected = tds_corrected * kValue;
 
     // 限制范围
     if (tds_corrected < 0.0f)

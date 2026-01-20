@@ -171,22 +171,22 @@ int main(void)
     
     // ===== 整合显示 =====
     printf("\r\n");
-    printf("╔════════════════════════════════════════╗\r\n");
-    printf("║  Water Quality & Temperature Monitor   ║\r\n");
-    printf("╠════════════════════════════════════════╣\r\n");
-    printf("║ Water Temperature (DS18B20): %.2f°C    ║\r\n", water_temp);
-    printf("╟────────────────────────────────────────╢\r\n");
-    printf("║ pH Value:              %.2f            ║\r\n", ph_val);
-    printf("║ Turbidity:             %.2f NTU        ║\r\n", turb_ntu);
-    printf("║ Turbidity Voltage:     %.2f V          ║\r\n", turb_vol);
-    printf("║ TDS (Corrected):       %.2f ppm        ║\r\n", tds_corrected);
-    printf("║ TDS (Raw):             %.2f ppm        ║\r\n", tds_raw);
-    printf("╟────────────────────────────────────────╢\r\n");
-    printf("║ Humidity (AHT20):      %d.%d%%         ║\r\n", humidity / 10, humidity % 10);
-    printf("║ Temperature (AHT20):   %d.%d°C         ║\r\n", temp / 10, temp % 10);
-    printf("║ Pressure (BMP280):     %.2f hPa        ║\r\n", pressure);
-    printf("║ Altitude (BMP280):     %.2f m          ║\r\n", altitude);
-    printf("╚════════════════════════════════════════╝\r\n");
+    printf("+----------------------------------------+\r\n");
+    printf("|  Water Quality & Temperature Monitor   |\r\n");
+    printf("+----------------------------------------+\r\n");
+    printf("| Water Temperature (DS18B20): %.2f C    |\r\n", water_temp);
+    printf("|----------------------------------------|\r\n");
+    printf("| pH Value:              %.2f            |\r\n", ph_val);
+    printf("| Turbidity:             %.2f NTU        |\r\n", turb_ntu);
+    printf("| Turbidity Voltage:     %.2f V          |\r\n", turb_vol);
+    printf("| TDS (Corrected):       %.2f ppm        |\r\n", tds_corrected);
+    printf("| TDS (Raw):             %.2f ppm        |\r\n", tds_raw);
+    printf("|----------------------------------------|\r\n");
+    printf("| Humidity (AHT20):      %d.%d%%         |\r\n", humidity / 10, humidity % 10);
+    printf("| Temperature (AHT20):   %d.%d C         |\r\n", temp / 10, temp % 10);
+    printf("| Pressure (BMP280):     %.2f hPa        |\r\n", pressure);
+    printf("| Altitude (BMP280):     %.2f m          |\r\n", altitude);
+    printf("+----------------------------------------+\r\n");
 
     HAL_Delay(1000);
   }
