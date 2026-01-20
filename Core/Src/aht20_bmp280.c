@@ -54,10 +54,10 @@ uint8_t AHT20_Read_Status(I2C_HandleTypeDef *hi2c)
 uint8_t AHT20_Read_Cal_Enable(I2C_HandleTypeDef *hi2c)
 {
     uint8_t val = AHT20_Read_Status(hi2c);
-    if ((val & 0x68) == 0x08) // 判断校准位和忙状态
+    // Bit3: 校准使能, Bit7: 忙
+    if ((val & 0x08) && ((val & 0x80) == 0x00))
         return 1;
-    else
-        return 0;
+    return 0;
 }
 
 // 初始化AHT20
@@ -92,12 +92,22 @@ uint8_t AHT20_Read_CTdata(I2C_HandleTypeDef *hi2c, uint32_t *ct)
 {
     uint8_t cmd[3] = {AHT20_START_MEASURE, 0x33, 0x00};
     uint8_t data[6] = {0};
+    uint8_t retry = 0;
 
-    // 1. 发送开始测量命令
-    HAL_StatusTypeDef hal_status = HAL_I2C_Master_Transmit(hi2c, AHT20_I2C_ADDRESS, cmd, 3, I2C_TIMEOUT);
+    // 1. 发送开始测量命令（带重试）
+    HAL_StatusTypeDef hal_status;
+    while (retry < 3)
+    {
+        hal_status = HAL_I2C_Master_Transmit(hi2c, AHT20_I2C_ADDRESS, cmd, 3, I2C_TIMEOUT);
+        if (hal_status == HAL_OK)
+            break;
+        retry++;
+        AHT20_Delay_Ms(10);
+    }
+
     if (hal_status != HAL_OK)
     {
-        printf("AHT20发送命令失败: %d\r\n", hal_status);
+        printf("AHT20发送命令失败（已重试%d次）: %d\r\n", retry, hal_status);
         return 0;
     }
 
@@ -136,7 +146,7 @@ uint8_t AHT20_Read_CTdata(I2C_HandleTypeDef *hi2c, uint32_t *ct)
     ct[0] = RetuData;
 
     RetuData = 0;
-    RetuData = (RetuData | data[3]) << 8;
+    RetuData = (RetuData | (data[3] & 0x0F)) << 8;
     RetuData = (RetuData | data[4]) << 8;
     RetuData = (RetuData | data[5]);
     RetuData = RetuData & 0xfffff;
@@ -267,6 +277,13 @@ static uint32_t BMP280_Compensate_Pressure(int32_t adc_p)
     var2 = (((int64_t)bmp280_calib.dig_P8) * p) >> 19;
     p = ((p + var1 + var2) >> 8) + (((int64_t)bmp280_calib.dig_P7) << 4);
 
+    // 合理性检查：气压范围 300-1100 hPa (7680000 - 28160000, 单位: Pa*256)
+    if (p < 7680000 || p > 28160000)
+    {
+        printf("BMP280气压值超出合理范围: %ld\r\n", (long)p);
+        return 0; // 返回无效值
+    }
+
     return (uint32_t)p;
 }
 
@@ -355,23 +372,18 @@ void BMP280GetData(I2C_HandleTypeDef *hi2c, float *pressure, float *temperature,
     temp_filtered = temp_raw / 100.0f;
 
     uint32_t press_raw = BMP280_Compensate_Pressure(bmp280_raw_pressure);
+    
+    // 检查压力值是否有效
+    if (press_raw == 0)
+    {
+        // 使用上次有效数据
+        return;
+    }
+    
     press_filtered = press_raw / 25600.0f;
 
-    // 滤波处理
-    static float pressure_history[FILTER_NUM] = {1013.25f, 1013.25f, 1013.25f, 1013.25f, 1013.25f};
-    static uint8_t history_index = 0;
-
-    // 更新历史数据
-    pressure_history[history_index] = press_filtered;
-    history_index = (history_index + 1) % FILTER_NUM;
-
-    // 计算平均值
-    float sum = 0;
-    for (int i = 0; i < FILTER_NUM; i++)
-    {
-        sum += pressure_history[i];
-    }
-    *pressure = sum / FILTER_NUM;
+    // 使用限幅滤波器进行滤波处理
+    Pressure_Filter(&press_filtered, pressure);
 
     *temperature = temp_filtered;
     *altitude = BMP280_Pressure_To_Altitude(pressure);

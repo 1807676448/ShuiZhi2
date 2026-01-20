@@ -33,6 +33,8 @@ virtualFolder:
                 - path: ../Core/Src/My_Debug.c
                 - path: ../Core/Src/tim.c
                 - path: ../Core/Src/ZhuoDu.c
+                - path: ../Core/Src/Ds18B20.c
+                - path: ../Core/Src/TDS.c
               folders: []
     - name: Drivers
       files: []

@@ -31,6 +31,8 @@
 #include "aht20_bmp280.h"
 #include "My_Debug.h"
 #include "ZhuoDu.h"
+#include "TDS.h"
+#include "Ds18B20.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -121,6 +123,27 @@ int main(void)
   }
 
   ZhuoDu_Init(&hadc1);
+  
+  // 初始化TDS传感器
+  if (TDS_Init(&hadc1) != 0)
+  {
+    // 初始化失败处理
+    Error_Handler();
+  }
+  
+  // 初始化DS18B20水温传感器
+  uint8_t ds18b20_init_result = DS18B20_Init();
+  if (ds18b20_init_result != 0)
+  {
+    printf("DS18B20 Init Failed! Result: %d\r\n", ds18b20_init_result);
+    Error_Handler();
+  }
+  else
+  {
+    printf("DS18B20 Init Success!\r\n");
+  }
+  
+  printf("====== Water Temperature System Started ======\r\n");
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -130,30 +153,40 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    // 读取所有传感器数据
     float ph_val = PH_Read_Median();
     float turb_vol = ZhuoDu_Read_Voltage();
     float turb_ntu = ZhuoDu_Read_NTU();
-
-    printf("pH Value: %.2f\r\n", ph_val);
-    printf("Turbidity: %.2f NTU (%.2f V)\r\n", turb_ntu, turb_vol);
-    printf("--------------\r\n");
-    HAL_Delay(100);
-
+    float tds_corrected = TDS_Read_Corrected();
+    float tds_raw = TDS_Read_Raw();
+    float water_temp = DS18B20_Get_Temp();
+    
     // 读取AHT20数据
     AHT20_Read_CTdata(&hi2c1, aht20_data);
-
-    // 计算温湿度值
-    int humidity = aht20_data[0] * 1000 / 1024 / 1024; // 20位数据，2^20 = 1048576
-    int temp = aht20_data[1] * 200 * 10 / 1024 / 1024 - 500; // 转换为摄氏度
-
+    int humidity = aht20_data[0] * 1000 / 1024 / 1024;
+    int temp = aht20_data[1] * 200 * 10 / 1024 / 1024 - 500;
+    
     // 读取BMP280数据
     BMP280GetData(&hi2c1, &pressure, &temperature, &altitude);
-
-    // 打印数据
-    printf("Humidity: %d.%d%%\r\n", humidity / 10, humidity % 10);
-    printf("Temperature: %d.%d°C\r\n", temp / 10, temp % 10);
-    printf("Pressure: %.2f hPa\r\n", pressure);
-    printf("Altitude: %.2f m\r\n", altitude);
+    
+    // ===== 整合显示 =====
+    printf("\r\n");
+    printf("╔════════════════════════════════════════╗\r\n");
+    printf("║  Water Quality & Temperature Monitor   ║\r\n");
+    printf("╠════════════════════════════════════════╣\r\n");
+    printf("║ Water Temperature (DS18B20): %.2f°C    ║\r\n", water_temp);
+    printf("╟────────────────────────────────────────╢\r\n");
+    printf("║ pH Value:              %.2f            ║\r\n", ph_val);
+    printf("║ Turbidity:             %.2f NTU        ║\r\n", turb_ntu);
+    printf("║ Turbidity Voltage:     %.2f V          ║\r\n", turb_vol);
+    printf("║ TDS (Corrected):       %.2f ppm        ║\r\n", tds_corrected);
+    printf("║ TDS (Raw):             %.2f ppm        ║\r\n", tds_raw);
+    printf("╟────────────────────────────────────────╢\r\n");
+    printf("║ Humidity (AHT20):      %d.%d%%         ║\r\n", humidity / 10, humidity % 10);
+    printf("║ Temperature (AHT20):   %d.%d°C         ║\r\n", temp / 10, temp % 10);
+    printf("║ Pressure (BMP280):     %.2f hPa        ║\r\n", pressure);
+    printf("║ Altitude (BMP280):     %.2f m          ║\r\n", altitude);
+    printf("╚════════════════════════════════════════╝\r\n");
 
     HAL_Delay(1000);
   }
